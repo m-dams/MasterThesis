@@ -2,9 +2,9 @@ import os
 import pandas as pd
 
 directory = r"C:\MasterThesis\v1.0\\"
-final_dataset = pd.DataFrame(columns = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', 'labels'])
 folders = os.listdir(directory)
 subjects = []
+list_of_dataframes = []
 for f in folders:
     if 'sub' in f:
         subjects.append(f)
@@ -24,8 +24,16 @@ for subject in subjects:
         df = pd.read_csv(rf"C:\MasterThesis\v1.0\{subject}\ses-001\{d}")
         df_l = pd.read_csv(rf"C:\MasterThesis\v1.0\{subject}\ses-001\{l}", sep='\t')
         df['labels'] = df_l['is_success']
-        # print(df)
-        final_dataset.append(df, ignore_index=False, verify_integrity=False)
-        print(final_dataset)
+        list_of_dataframes.append(df)
+        print(df)
 
-final_dataset.to_csv(rf'C:\MasterThesis\v1.0\pupil_dataset.csv', index=False)
+df = pd.concat(list_of_dataframes)
+df.to_csv(rf'C:\MasterThesis\v1.0\pupil_dataset.csv', index=False)
+
+
+# Apply butterworth filter
+
+for s_idx, sequence in enumerate(data_events):
+    for ch_idx, channel in enumerate(sequence):
+        y = butter_lowpass_filter(channel, cutoff, fs, order)
+        data_events[s_idx][ch_idx] = y
