@@ -7,6 +7,8 @@ import pandas as pd
 from scipy.signal import butter, filtfilt
 
 
+DATA_FOR_LSTM = True
+
 def butter_lowpass(cutoff, fs, order=5):
     nyq = 0.5 * fs
     normal_cutoff = cutoff / nyq
@@ -139,29 +141,32 @@ for srt in subject_run_tuples:
             normalized_pupil_sizes = [(x - mean_pupil_size) / std_pupil_size for x in channel]
             print(normalized_pupil_sizes)
             data_events[s_idx][ch_idx] = normalized_pupil_sizes
+    if not DATA_FOR_LSTM:
+        for s_idx, sequence in enumerate(data_events):
+            for ch_idx, channel in enumerate(sequence):
+                eeg_data = channel
+                mean = np.mean(eeg_data)
+                variance = np.var(eeg_data)
+                std_dev = np.std(eeg_data)
+                power_spectrum = np.abs(scipy.fft.fft(eeg_data)) ** 2
+                freqs = scipy.fft.fftfreq(len(eeg_data), 1 / 128)
+                delta_power = np.mean(power_spectrum[(freqs >= 0.5) & (freqs <= 4)])
+                theta_power = np.mean(power_spectrum[(freqs > 4) & (freqs <= 8)])
+                alpha_power = np.mean(power_spectrum[(freqs > 8) & (freqs <= 12)])
+                beta_power = np.mean(power_spectrum[(freqs > 12) & (freqs <= 30)])
 
-    for s_idx, sequence in enumerate(data_events):
-        for ch_idx, channel in enumerate(sequence):
-            eeg_data = channel
-            mean = np.mean(eeg_data)
-            variance = np.var(eeg_data)
-            std_dev = np.std(eeg_data)
-            power_spectrum = np.abs(scipy.fft.fft(eeg_data)) ** 2
-            freqs = scipy.fft.fftfreq(len(eeg_data), 1 / 128)
-            delta_power = np.mean(power_spectrum[(freqs >= 0.5) & (freqs <= 4)])
-            theta_power = np.mean(power_spectrum[(freqs > 4) & (freqs <= 8)])
-            alpha_power = np.mean(power_spectrum[(freqs > 8) & (freqs <= 12)])
-            beta_power = np.mean(power_spectrum[(freqs > 12) & (freqs <= 30)])
+                features = [mean, variance, std_dev, delta_power, theta_power, alpha_power, beta_power]
 
-            features = [mean, variance, std_dev, delta_power, theta_power, alpha_power, beta_power]
-
-            print("Extracted features:", features)
-            data_events[s_idx][ch_idx] = features
+                print("Extracted features:", features)
+                data_events[s_idx][ch_idx] = features
 
     arr = np.array(data_events)
     arr_reshaped = arr.reshape(180, -1)  # -1 means calculate the size of this dimension
     df = pd.DataFrame(arr_reshaped)
     print(df.shape)
 
-    df.to_csv(rf'C:\MasterThesis\v1.0\sub-{subject}\ses-001\{subject}_{run}_pupil_dataset.csv', index=False)
+    if not DATA_FOR_LSTM:
+        df.to_csv(rf'C:\MasterThesis\v1.0\sub-{subject}\ses-001\{subject}_{run}_pupil_dataset.csv', index=False)
+    else:
+        df.to_csv(rf'C:\MasterThesis\v1.0\sub-{subject}\ses-001\{subject}_{run}_pupil_dataset_LSTM.csv', index=False)
 print(f"There are {how_many_nan} rows with NaN")
