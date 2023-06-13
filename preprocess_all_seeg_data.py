@@ -53,9 +53,9 @@ def check_missing_values(arr):
         return False
 
 how_many_nan = 0
-subject_run_tuples = [[('003', 1), ('003', 2), ('004', 1), ('004', 2), ('005', 1), ('005', 2), ('005', 3), ('005', 4),
+subject_run_tuples = [('003', 1), ('003', 2), ('004', 1), ('004', 2), ('005', 1), ('005', 2), ('005', 3), ('005', 4),
                       ('007', 1), ('009', 1), ('009', 2), ('011', 1), ('011', 2), ('012', 1), ('012', 2),
-                      ('012', 3), ('012', 4)]]
+                      ('012', 3), ('012', 4)]
 for srt in subject_run_tuples:
     path_to_dataset = r"C:\MasterThesis\v1.0"  # Please change this value
 
@@ -113,7 +113,6 @@ for srt in subject_run_tuples:
 
     regions = electrode_df['anatomy_structure']
     regions = set(regions)
-    regions
 
     valid_electrodes = [x['name'] for idx, x in electrode_df.iterrows() if x['anatomy_structure'] in ['hippocampus']]
     print(valid_electrodes)
@@ -149,7 +148,7 @@ for srt in subject_run_tuples:
 
     data_events = []
     for e in events_df['uutc']:
-        data_events.append(ms.read_ts_channels_uutc(channels, [e - 500000, e + 1000000]))
+        data_events.append(ms.read_ts_channels_uutc(channels, [e - 700000, e + 1300000]))
     data_events = np.array(data_events)
 
     target_freq = 1000
@@ -163,7 +162,6 @@ for srt in subject_run_tuples:
         downsampled_data_events.append(downsampled_sequence)
 
     data_events = np.array(downsampled_data_events)
-    data_events.shape
 
     how_many_nan = 0
     for s_idx, sequence in enumerate(data_events):
@@ -190,7 +188,7 @@ for srt in subject_run_tuples:
         data_normalized = (channel - mean) / std
         channels_list[idx] = data_normalized
 
-    samples_in_sequence = int(target_freq * 1.5)
+    samples_in_sequence = int(target_freq * 2.0)
     chunks_list = [[] for x in range(len(channels))]
     for idx, channel in enumerate(channels_list):
         chunks_list[idx] = split_list(channel, samples_in_sequence)

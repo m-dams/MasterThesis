@@ -7,18 +7,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import skew, kurtosis, variation
-import scipy.fft
+import mne
 
 from scipy.signal import butter, filtfilt
 
 DATA_FOR_LSTM = True
 APPLY_LOW_PASS_FILTER = True
-FEATURE_SET = 3
-
-# Parameters
-order = 3
-fs = 150.0  # sample rate, Hz
-cutoff = 30.0
+FEATURE_SET = 1
 
 
 def butter_lowpass(cutoff, fs, order=5):
@@ -77,7 +72,6 @@ for srt in subject_run_tuples:
 
     json_entities = json_file.entities
 
-
     channel_file = l.get(suffix='channels', extension='tsv',
                          task=json_entities['task'],
                          subject=json_entities['subject'],
@@ -86,7 +80,6 @@ for srt in subject_run_tuples:
     channel_df = channel_file.get_df()
     channel_df = channel_df[channel_df['status'] != 'bad']
     channel_df
-
 
     events_file = l.get(suffix='events', extension='tsv',
                         task=json_entities['task'],
@@ -99,7 +92,6 @@ for srt in subject_run_tuples:
     events_df = events_df.loc[~events_df['trial_type'].isna(), ['onset', 'sample', 'duration', 'trial_type', 'list']]
     events_df = events_df[events_df['trial_type'] == 'ENCODE']
     events_df = events_df.reset_index(drop=True)
-
 
     # Since we are using MEF3 pybids has problems recognizing the extension so we need to modify the json extension
     mef_session_path = os.path.splitext(json_file.path)[0] + '.mefd'
@@ -144,6 +136,7 @@ for srt in subject_run_tuples:
         data_events.append(ms.read_ts_channels_uutc(channels, [e - 600000, e + 900000]))
     data_events = np.array(data_events)
 
+
     def check_missing_values(arr):
         """Check if a numpy array has missing values."""
         if np.isnan(arr).any():
@@ -151,6 +144,7 @@ for srt in subject_run_tuples:
             return True
         else:
             return False
+
 
     for s_idx, sequence in enumerate(data_events):
         for ch_idx, channel in enumerate(sequence):
@@ -186,7 +180,6 @@ for srt in subject_run_tuples:
             channel_2_raw.append(sample)
     channel_1_raw = np.array(channel_1_raw)
     channel_2_raw = np.array(channel_2_raw)
-    channel_1_raw.shape
 
     mean = np.mean(channel_1_raw)
     std = np.std(channel_1_raw)
@@ -198,9 +191,11 @@ for srt in subject_run_tuples:
     data_normalized = (channel_2_raw - mean) / std
     channel_2_raw = data_normalized
 
+
     def split_list(lst, n):
         """Split the list, lst, into chunks of size n."""
         return [lst[i:i + n] for i in range(0, len(lst), n)]
+
 
     samples_in_window = 225
     chunks_1 = split_list(channel_1_raw, samples_in_window)
@@ -231,51 +226,25 @@ for srt in subject_run_tuples:
         return y
 
 
-    # Parameters
     order = 3
     fs = 150.0  # sample rate, Hz
-    cutoff = 30.0  # desired cutoff frequency of the filter, Hz
+    cutoff = 10.0  # desired cutoff frequency of the filter, Hz
 
-    # %%
     for s_idx, sequence in enumerate(data_events):
         for ch_idx, channel in enumerate(sequence):
             y = butter_lowpass_filter(channel, cutoff, fs, order)
             data_events[s_idx][ch_idx] = y
 
+    sfreq = 150  # replace with your sampling frequency
+    # delta: 2.5-5 Hz, theta: 4–9 Hz, alpha: 9–16 Hz, beta: 16–25 Hz,
+    freqs = [9., 16., 25.]  # define the range of frequency bands
+    # freqs = [5.]
+    print(freqs)
+    n_cycles = 7.0
 
-    if FEATURE_SET == 1:
-        for s_idx, sequence in enumerate(data_events):
-            for ch_idx, channel in enumerate(sequence):
-                eeg_data = channel
-                # Calculate Mean of the signal as a feature
-                mean = np.mean(eeg_data)
-
-                # Calculate Variance of the signal as a feature
-                variance = np.var(eeg_data)
-
-                # Calculate Standard Deviation of the signal as a feature
-                std_dev = np.std(eeg_data)
-
-                # Use Fast Fourier Transform to get the power spectrum of the signal
-                power_spectrum = np.abs(scipy.fft.fft(eeg_data)) ** 2
-
-                # Frequency values for plotting the spectrum - assuming a sampling rate (fs) of 128 Hz
-                freqs = scipy.fft.fftfreq(len(eeg_data), 1 / 128)
-
-                # Let's use the mean power in specific frequency bands as features
-                delta_power = np.mean(power_spectrum[(freqs >= 0.5) & (freqs <= 4)])
-                theta_power = np.mean(power_spectrum[(freqs > 4) & (freqs <= 8)])
-                alpha_power = np.mean(power_spectrum[(freqs > 8) & (freqs <= 12)])
-                beta_power = np.mean(power_spectrum[(freqs > 12) & (freqs <= 30)])
-
-                # Gather all features into a list
-                features = [mean, variance, std_dev, delta_power, theta_power, alpha_power, beta_power]
-
-                print("Extracted features:", features)
-                data_events[s_idx][ch_idx] = features
-        print(len(data_events))
-        print(len(data_events[0]))
-        print(len(data_events[0][0]))
+    # perform Morlet Wavelet transform
+    power = mne.time_frequency.tfr_array_morlet(data_events, sfreq, freqs, n_cycles=n_cycles)
+    power = np.mean(power, axis=1)
 
     if FEATURE_SET == 2 and not LSTM_READY:
         data_events = data_events.tolist()
@@ -321,7 +290,10 @@ for srt in subject_run_tuples:
         data_events = np.array(data_events)
         print(data_events.shape)
 
-    arr = np.array(data_events)
+    power_magnitude = np.abs(power)
+    # convert to a decibel scale, which is often done for power spectral densities:
+    power_db = 10 * np.log10(power_magnitude)
+    arr = np.array(power_db)
 
     # Reshape the array to the required shape (180, 450)
     arr_reshaped = arr.reshape(180, -1)  # -1 means calculate the size of this dimension
@@ -333,6 +305,5 @@ for srt in subject_run_tuples:
 
     df.head()
     df.to_csv(rf'C:\MasterThesis\v1.0\sub-{subject}\ses-001\{subject}_{run}_pupil_dataset.csv', index=False)
-
 
 print(f"There are {how_many_nan} rows with NaN")
