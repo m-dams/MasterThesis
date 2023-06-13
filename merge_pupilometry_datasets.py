@@ -14,6 +14,7 @@ for f in folders:
 
 if not DATA_FOR_LSTM:
     for subject in subjects:
+        # if 'sub-004' in subject:
         if 'sub' in subject:
             path = directory + subject + r'\ses-001\\'
             print(path)
@@ -21,7 +22,7 @@ if not DATA_FOR_LSTM:
             datasets = []
             labels = []
             for f in files:
-                if 'dataset' in f:
+                if 'pupil_dataset' in f:
                     datasets.append(f)
                 elif 'labels' in f:
                     labels.append(f)

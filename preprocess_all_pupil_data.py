@@ -7,12 +7,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import skew, kurtosis, variation
+import scipy.fft
 
 from scipy.signal import butter, filtfilt
 
 DATA_FOR_LSTM = True
 APPLY_LOW_PASS_FILTER = True
-FEATURE_SET = 2
+FEATURE_SET = 3
 
 # Parameters
 order = 3
@@ -52,12 +53,16 @@ subject_run_tuples = [('003', 1), ('003', 2), ('004', 1), ('004', 2), ('005', 1)
                       ('006', 1), ('007', 1), ('009', 1), ('009', 2), ('011', 1), ('011', 2), ('012', 1), ('012', 2),
                       ('012', 3), ('012', 4)]
 for srt in subject_run_tuples:
+    APPLY_LOW_PASS_FILTER = True
+    LSTM_READY = False
+    FEATURE_SET = 3
+    subject = srt[0]
+    run = srt[1]
+
     path_to_dataset = r"C:\MasterThesis\v1.0"  # Please change this value
 
     l = BIDSLayout(path_to_dataset)
 
-    subject = srt[0]
-    run = srt[1]
     filter_dictionary = {'subject': subject,
                          'session': '001',
                          'task': 'FR',
@@ -72,7 +77,7 @@ for srt in subject_run_tuples:
 
     json_entities = json_file.entities
 
-    # Get channels
+
     channel_file = l.get(suffix='channels', extension='tsv',
                          task=json_entities['task'],
                          subject=json_entities['subject'],
@@ -80,6 +85,8 @@ for srt in subject_run_tuples:
                          run=json_entities['run'])[0]
     channel_df = channel_file.get_df()
     channel_df = channel_df[channel_df['status'] != 'bad']
+    channel_df
+
 
     events_file = l.get(suffix='events', extension='tsv',
                         task=json_entities['task'],
@@ -92,6 +99,7 @@ for srt in subject_run_tuples:
     events_df = events_df.loc[~events_df['trial_type'].isna(), ['onset', 'sample', 'duration', 'trial_type', 'list']]
     events_df = events_df[events_df['trial_type'] == 'ENCODE']
     events_df = events_df.reset_index(drop=True)
+
 
     # Since we are using MEF3 pybids has problems recognizing the extension so we need to modify the json extension
     mef_session_path = os.path.splitext(json_file.path)[0] + '.mefd'
@@ -120,6 +128,7 @@ for srt in subject_run_tuples:
     events_df['uutc'] = (events_df['microsecond_onset'] + session_start_utc).astype('int64')
     events_in_win = events_df[(start_time < events_df['uutc'])
                               & (events_df['uutc'] < stop_time)]
+
     # records_in_events = [x for x in records if (0 < (x['time'] - events_df['uutc']) < 150000)]
     records_in_events = []
     for x in records:
@@ -128,10 +137,20 @@ for srt in subject_run_tuples:
             if 0 == (x['time'] - e):
                 records_in_events.append(x)
 
+    len(records_in_events)
     data_events = []
+    # −200ms to 0ms from the onset and from 1000ms to 1400ms
     for e in events_df['uutc']:
-        data_events.append(ms.read_ts_channels_uutc(channels, [e - 500000, e + 1000000]))
+        data_events.append(ms.read_ts_channels_uutc(channels, [e - 600000, e + 900000]))
     data_events = np.array(data_events)
+
+    def check_missing_values(arr):
+        """Check if a numpy array has missing values."""
+        if np.isnan(arr).any():
+            print("The array has missing values.")
+            return True
+        else:
+            return False
 
     for s_idx, sequence in enumerate(data_events):
         for ch_idx, channel in enumerate(sequence):
@@ -157,7 +176,6 @@ for srt in subject_run_tuples:
                 df['signal'] = df['signal'].bfill().ffill().interpolate(method='linear')
                 data_events[s_idx][ch_idx] = df['signal'].values.tolist()
                 print(data_events[s_idx][ch_idx])
-    print(how_many_nan)
 
     channel_1_raw = []
     channel_2_raw = []
@@ -168,6 +186,7 @@ for srt in subject_run_tuples:
             channel_2_raw.append(sample)
     channel_1_raw = np.array(channel_1_raw)
     channel_2_raw = np.array(channel_2_raw)
+    channel_1_raw.shape
 
     mean = np.mean(channel_1_raw)
     std = np.std(channel_1_raw)
@@ -179,9 +198,14 @@ for srt in subject_run_tuples:
     data_normalized = (channel_2_raw - mean) / std
     channel_2_raw = data_normalized
 
-    chunks_1 = split_list(channel_1_raw, 225)
-    chunks_2 = split_list(channel_2_raw, 225)
+    def split_list(lst, n):
+        """Split the list, lst, into chunks of size n."""
+        return [lst[i:i + n] for i in range(0, len(lst), n)]
 
+    samples_in_window = 225
+    chunks_1 = split_list(channel_1_raw, samples_in_window)
+    chunks_2 = split_list(channel_2_raw, samples_in_window)
+    print(len(chunks_1))
     for s_idx, sequence in enumerate(data_events):
         for ch_idx, channel in enumerate(sequence):
             if ch_idx == 0:
@@ -189,13 +213,71 @@ for srt in subject_run_tuples:
             elif ch_idx == 1:
                 data_events[s_idx][ch_idx] = chunks_2[s_idx]
     data_events = np.array(data_events)
+    print(data_events.shape)
 
+    print(data_events[0][0][0])
+
+
+    def butter_lowpass(cutoff, fs, order=5):
+        nyq = 0.5 * fs
+        normal_cutoff = cutoff / nyq
+        b, a = butter(order, normal_cutoff, btype='low', analog=False)
+        return b, a
+
+
+    def butter_lowpass_filter(data, cutoff, fs, order=5):
+        b, a = butter_lowpass(cutoff, fs, order=order)
+        y = filtfilt(b, a, data)
+        return y
+
+
+    # Parameters
+    order = 3
+    fs = 150.0  # sample rate, Hz
+    cutoff = 30.0  # desired cutoff frequency of the filter, Hz
+
+    # %%
     for s_idx, sequence in enumerate(data_events):
         for ch_idx, channel in enumerate(sequence):
             y = butter_lowpass_filter(channel, cutoff, fs, order)
             data_events[s_idx][ch_idx] = y
 
-    if FEATURE_SET == 2 and not DATA_FOR_LSTM:
+
+    if FEATURE_SET == 1:
+        for s_idx, sequence in enumerate(data_events):
+            for ch_idx, channel in enumerate(sequence):
+                eeg_data = channel
+                # Calculate Mean of the signal as a feature
+                mean = np.mean(eeg_data)
+
+                # Calculate Variance of the signal as a feature
+                variance = np.var(eeg_data)
+
+                # Calculate Standard Deviation of the signal as a feature
+                std_dev = np.std(eeg_data)
+
+                # Use Fast Fourier Transform to get the power spectrum of the signal
+                power_spectrum = np.abs(scipy.fft.fft(eeg_data)) ** 2
+
+                # Frequency values for plotting the spectrum - assuming a sampling rate (fs) of 128 Hz
+                freqs = scipy.fft.fftfreq(len(eeg_data), 1 / 128)
+
+                # Let's use the mean power in specific frequency bands as features
+                delta_power = np.mean(power_spectrum[(freqs >= 0.5) & (freqs <= 4)])
+                theta_power = np.mean(power_spectrum[(freqs > 4) & (freqs <= 8)])
+                alpha_power = np.mean(power_spectrum[(freqs > 8) & (freqs <= 12)])
+                beta_power = np.mean(power_spectrum[(freqs > 12) & (freqs <= 30)])
+
+                # Gather all features into a list
+                features = [mean, variance, std_dev, delta_power, theta_power, alpha_power, beta_power]
+
+                print("Extracted features:", features)
+                data_events[s_idx][ch_idx] = features
+        print(len(data_events))
+        print(len(data_events[0]))
+        print(len(data_events[0][0]))
+
+    if FEATURE_SET == 2 and not LSTM_READY:
         data_events = data_events.tolist()
         # Assuming 'eeg_data' is a NumPy array containing your EEG data.
         for s_idx, sequence in enumerate(data_events):
@@ -209,12 +291,32 @@ for srt in subject_run_tuples:
                 q3 = np.percentile(eeg_data, 75)
                 min_signal = np.min(eeg_data)
                 max_signal = np.max(eeg_data)
-                variance = variation(eeg_data)
-                skewness = skew(eeg_data)
+                # variance = variation(eeg_data)
+                # skewness = skew(eeg_data)
 
-                features = [mean, q1, q2, q3, min_signal, max_signal, variance, skewness]
+                features = [mean, q1, q2, q3, min_signal, max_signal]
 
                 # print("Extracted features:", features)
+                data_events[s_idx][ch_idx] = features
+        data_events = np.array(data_events)
+        print(data_events.shape)
+
+    if FEATURE_SET == 3:
+        data_events = data_events.tolist()
+        # Assuming 'eeg_data' is a NumPy array containing your EEG data.
+        for s_idx, sequence in enumerate(data_events):
+            for ch_idx, channel in enumerate(sequence):
+                eeg_data = channel
+                # Assuming 'eeg_data' is a NumPy array containing your EEG data for one channel
+
+                mean = np.mean(eeg_data)
+                variance = variation(eeg_data)
+                skewness = skew(eeg_data)
+                # kurtosis = kurtosis(eeg_data)
+
+                features = [mean, variance, skewness]
+
+                print("Extracted features:", features)
                 data_events[s_idx][ch_idx] = features
         data_events = np.array(data_events)
         print(data_events.shape)
@@ -226,5 +328,11 @@ for srt in subject_run_tuples:
 
     df = pd.DataFrame(arr_reshaped)
 
+    # Now df is a DataFrame with shape (180, 450)
+    print(df.shape)
+
+    df.head()
     df.to_csv(rf'C:\MasterThesis\v1.0\sub-{subject}\ses-001\{subject}_{run}_pupil_dataset.csv', index=False)
+
+
 print(f"There are {how_many_nan} rows with NaN")
