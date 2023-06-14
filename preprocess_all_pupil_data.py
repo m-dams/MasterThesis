@@ -228,7 +228,7 @@ for srt in subject_run_tuples:
 
     order = 3
     fs = 150.0  # sample rate, Hz
-    cutoff = 10.0  # desired cutoff frequency of the filter, Hz
+    cutoff = 20.0  # desired cutoff frequency of the filter, Hz
 
     for s_idx, sequence in enumerate(data_events):
         for ch_idx, channel in enumerate(sequence):
@@ -237,7 +237,7 @@ for srt in subject_run_tuples:
 
     sfreq = 150  # replace with your sampling frequency
     # delta: 2.5-5 Hz, theta: 4–9 Hz, alpha: 9–16 Hz, beta: 16–25 Hz,
-    freqs = [9., 16., 25.]  # define the range of frequency bands
+    freqs = [9., 16., 25., 40.]  # define the range of frequency bands
     # freqs = [5.]
     print(freqs)
     n_cycles = 7.0
