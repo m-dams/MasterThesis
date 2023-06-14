@@ -133,7 +133,7 @@ for srt in subject_run_tuples:
     data_events = []
     # −200ms to 0ms from the onset and from 1000ms to 1400ms
     for e in events_df['uutc']:
-        data_events.append(ms.read_ts_channels_uutc(channels, [e - 600000, e + 900000]))
+        data_events.append(ms.read_ts_channels_uutc(channels, [e - 400000, e + 1100000]))
     data_events = np.array(data_events)
 
 

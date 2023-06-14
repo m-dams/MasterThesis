@@ -115,9 +115,13 @@ for srt in subject_run_tuples:
     regions = set(regions)
 
     valid_electrodes = [x['name'] for idx, x in electrode_df.iterrows() if x['anatomy_structure'] in ['hippocampus']]
-    print(valid_electrodes)
+    print(f'valid_electrodes = {valid_electrodes}')
 
     channels = valid_electrodes
+    while len(channels) < 13:
+        channels.extend(valid_electrodes)
+    channels = channels[0:13]
+    print(f'channels = {channels}')
 
     # Microseconds 1 μs = 10⁻⁶ s
     start_time = 1553941347170839 + 3 * 1e6  # in microseconds
@@ -222,7 +226,7 @@ for srt in subject_run_tuples:
     power_magnitude = np.abs(power)
     # convert to a decibel scale, which is often done for power spectral densities:
     power_db = 10 * np.log10(power_magnitude)
-    # %%
+
     arr = np.array(power_db)
 
     # Reshape the array to the required shape (180, 450)
@@ -237,7 +241,5 @@ for srt in subject_run_tuples:
         pca_data = pca.fit_transform(df)
         df = pd.DataFrame(pca_data)
         print(pca_data.shape)
-    # %%
-    df.head()
-    # %%
+
     df.to_csv(rf'C:\MasterThesis\v1.0\sub-{subject}\ses-001\{subject}_{run}_sEEG_dataset.csv', index=False)
