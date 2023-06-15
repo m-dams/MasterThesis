@@ -20,7 +20,7 @@ if not DATA_FOR_LSTM:
         datasets = []
         labels = []
         for f in files:
-            if 'sEEG_dataset_heterotopia' in f:
+            if 'sEEG_dataset_wm' in f:
                 datasets.append(f)
             elif 'labels' in f:
                 labels.append(f)

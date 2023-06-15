@@ -54,7 +54,7 @@ def check_missing_values(arr):
 
 how_many_nan = 0
 subject_run_tuples = [('003', 1), ('003', 2), ('004', 1), ('004', 2), ('005', 1), ('005', 2), ('005', 3), ('005', 4),
-                      ('007', 1), ('009', 1), ('009', 2), ('011', 1), ('011', 2), ('012', 1), ('012', 2),
+                      ('006', 1), ('007', 1), ('009', 1), ('009', 2), ('011', 1), ('011', 2), ('012', 1), ('012', 2),
                       ('012', 3), ('012', 4)]
 for srt in subject_run_tuples:
     path_to_dataset = r"C:\MasterThesis\v1.0"  # Please change this value
@@ -114,13 +114,13 @@ for srt in subject_run_tuples:
     regions = electrode_df['anatomy_structure']
     regions = set(regions)
 
-    valid_electrodes = [x['name'] for idx, x in electrode_df.iterrows() if x['anatomy_structure'] in ['heterotopia']]
+    valid_electrodes = [x['name'] for idx, x in electrode_df.iterrows() if x['anatomy_structure'] in ['wm']]
     print(f'valid_electrodes = {valid_electrodes}')
 
     channels = valid_electrodes
-    while len(channels) < 3:
+    while len(channels) < 1:
         channels.extend(valid_electrodes)
-    channels = channels[0:3]
+    channels = channels[0:1]
     print(f'channels = {channels}')
     # Microseconds 1 μs = 10⁻⁶ s
     start_time = 1553941347170839 + 3 * 1e6  # in microseconds
@@ -241,4 +241,4 @@ for srt in subject_run_tuples:
         df = pd.DataFrame(pca_data)
         print(pca_data.shape)
 
-    df.to_csv(rf'C:\MasterThesis\v1.0\sub-{subject}\ses-001\{subject}_{run}_sEEG_dataset_heterotopia.csv', index=False)
+    df.to_csv(rf'C:\MasterThesis\v1.0\sub-{subject}\ses-001\{subject}_{run}_sEEG_dataset_wm.csv', index=False)
