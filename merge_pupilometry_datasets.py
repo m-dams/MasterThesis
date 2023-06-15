@@ -14,7 +14,7 @@ for f in folders:
 
 if not DATA_FOR_LSTM:
     for subject in subjects:
-        # if 'sub-004' in subject:
+        # if 'sub-012' in subject:
         if 'sub' in subject:
             path = directory + subject + r'\ses-001\\'
             print(path)

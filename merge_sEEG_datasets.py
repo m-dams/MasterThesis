@@ -11,17 +11,16 @@ for f in folders:
     if 'sub' in f:
         subjects.append(f)
 
-
 if not DATA_FOR_LSTM:
     for subject in subjects:
-        # if 'sub-004' in subject:
+        # if 'sub-007' in subject:
         path = directory + subject + r'\ses-001\\'
         print(path)
         files = os.listdir(path)
         datasets = []
         labels = []
         for f in files:
-            if 'sEEG_dataset' in f:
+            if 'sEEG_dataset_heterotopia' in f:
                 datasets.append(f)
             elif 'labels' in f:
                 labels.append(f)
